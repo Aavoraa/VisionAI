@@ -1,0 +1,33 @@
+# GPU override: serve a real model on an NVIDIA GPU.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#
+# Host requirements: NVIDIA driver + NVIDIA Container Toolkit
+# (verify with: docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu24.04 nvidia-smi).
+# TORCH_INDEX_URL must match a CUDA version your driver supports (see nvidia-smi and
+# https://pytorch.org/get-started/locally/).
+
+services:
+  api:
+    build:
+      context: .
+      args:
+        INSTALL_LOCAL_MODEL: "true"
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}
+    image: vision-api:gpu
+    environment:
+      VISION_USE_MOCK_MODEL: "false"
+      VISION_MODEL_NAME: ${VISION_MODEL_NAME:-HuggingFaceTB/SmolVLM-256M-Instruct}
+      VISION_MODEL_DEVICE: cuda
+      # One process per GPU: every Uvicorn worker would load its own copy of the weights.
+      WEB_CONCURRENCY: "1"
+    healthcheck:
+      # First start downloads the weights; give it time before counting failures.
+      start_period: 10m
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

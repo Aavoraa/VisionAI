@@ -1,0 +1,139 @@
+# Local / staging stack: PostgreSQL + Redis + one-shot schema init + API + dashboard.
+#
+#   docker compose up --build -d
+#   docker compose run --rm api python scripts/init_db.py create-key --email you@example.com
+#   docker compose run --rm api python scripts/create_admin.py --email you@example.com
+#
+# Dashboard: http://localhost:3000 (nginx -> Next.js -> API). The Next.js container itself is
+# never published: nginx sets X-Forwarded-For, and the API trusts that header only from the
+# dashboard's fixed address (DASHBOARD_IP), so sign-in throttling sees real client IPs.
+#
+# Credentials default to local-development values; override them via environment variables
+# or a root-level .env (e.g. POSTGRES_PASSWORD=...) for anything shared. Database/Redis ports
+# are bound to 127.0.0.1 only. Change *_HOST_PORT if 5432/6379/8000 are already in use.
+
+name: vision-api
+
+x-api-environment: &api-environment
+  # Container-network addresses; these take precedence over values in .env.
+  VISION_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-vision_api}
+  VISION_REDIS_URL: redis://redis:6379/0
+  VISION_ENVIRONMENT: ${VISION_ENVIRONMENT:-development}
+
+x-dashboard-ip: &dashboard-ip ${DASHBOARD_IP:-172.28.0.10}
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-vision_api}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # $$ defers expansion to the container shell (values come from the environment above).
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Rate-limit counters are ephemeral; persistence is unnecessary.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Creates missing tables, then exits. The API starts only after it succeeds.
+  init-db:
+    build: .
+    image: vision-api:local
+    command: ["python", "scripts/init_db.py"]
+    env_file:
+      - path: .env
+        required: false
+    environment: *api-environment
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: .
+    image: vision-api:local
+    ports:
+      - "${API_HOST_PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *api-environment
+      # uvicorn honours X-Forwarded-For only from these peers: the dashboard container.
+      # Direct API clients (published port) are never trusted, so their header is ignored.
+      FORWARDED_ALLOW_IPS: *dashboard-ip
+      VISION_DOCUMENT_STORAGE_DIR: /data/invoices
+    volumes:
+      - models:/models
+      # Uploaded invoices and their page images (private; see VISION_DOCUMENT_STORAGE_DIR).
+      - invoices:/data/invoices
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    # GPU serving: layer docker-compose.gpu.yml on top of this file, which builds CUDA torch
+    # into the image, enables the real model and reserves the GPU:
+    #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+
+  # Next.js admin/customer console. /api/* is rewritten to the API over the compose network.
+  # Both URLs are baked in at build time; rebuild after changing them.
+  dashboard:
+    build:
+      context: ../dashboard
+      args:
+        VISION_API_URL: http://api:8000
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    image: vision-dashboard:local
+    networks:
+      default:
+        ipv4_address: *dashboard-ip
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # The only way in to the dashboard. Overwrites X-Forwarded-For with the real peer address.
+  dashboard-proxy:
+    image: nginxinc/nginx-unprivileged:1.28-alpine
+    ports:
+      - "${DASHBOARD_HOST_PORT:-3000}:8080"
+    volumes:
+      - ./deploy/nginx/dashboard.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      dashboard:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${COMPOSE_SUBNET:-172.28.0.0/24}
+
+volumes:
+  pgdata:
+  models:
+  invoices:

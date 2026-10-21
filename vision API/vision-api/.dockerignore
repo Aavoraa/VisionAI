@@ -1,0 +1,21 @@
+# Keep the build context small and free of secrets/dev artefacts.
+.venv/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.git/
+.gitignore
+tests/
+*.md
+.env
+.env.*
+!.env.example
+.claude/
+Dockerfile
+.dockerignore
+docker-compose*.yml
+requirements-dev.txt
+deploy/
+dev.db
+benchmarks/
+data/

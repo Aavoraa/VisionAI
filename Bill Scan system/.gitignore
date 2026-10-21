@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Data: the bill database and the original photos are private and local
+backend/data/*.db
+backend/data/uploads/*
+!backend/data/uploads/.gitkeep
+
+# Node
+node_modules/
+dist/

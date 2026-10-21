@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invoice Tester</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #0f172a; --muted: #475569; --line: #e2e8f0;
+    --primary: #14532d; --primary-text: #ffffff; --focus: #86efac;
+    --ok-bg: #dcfce7; --ok: #166534; --check-bg: #fef3c7; --check: #92400e;
+    --miss-bg: #f1f5f9; --miss: #475569; --fail-bg: #fee2e2; --fail: #991b1b;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1120; --panel: #111827; --text: #e5e7eb; --muted: #9ca3af; --line: #1f2937;
+      --primary: #15803d; --focus: #166534;
+      --ok-bg: #052e16; --ok: #86efac; --check-bg: #422006; --check: #fcd34d;
+      --miss-bg: #1f2937; --miss: #9ca3af; --fail-bg: #450a0a; --fail: #fca5a5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
+  header { padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .api { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--miss); margin-right: 6px; vertical-align: middle; }
+  .dot.up { background: #16a34a; } .dot.down { background: #dc2626; }
+  main { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; padding: 20px 24px; max-width: 1700px; margin: 0 auto; }
+  main > section { min-width: 0; }
+  main.collapsed { grid-template-columns: minmax(0, 1fr); }
+  main.collapsed > section[aria-label=Upload] { display: none; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .panel + .panel { margin-top: 16px; }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .row { display: flex; gap: 8px; }
+  input[type=text], input[type=password] { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: 14px var(--mono); }
+  input:focus, button:focus-visible, .drop:focus-within { outline: 3px solid var(--focus); outline-offset: 1px; }
+  button { cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); padding: 9px 12px; font: inherit; }
+  button.primary { background: var(--primary); color: var(--primary-text); border-color: var(--primary); width: 100%; font-weight: 600; margin-top: 14px; min-height: 44px; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .drop { margin-top: 14px; border: 2px dashed var(--line); border-radius: 10px; padding: 16px; text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.over { border-color: var(--primary); }
+  .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .preview { margin-top: 12px; max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .preview img { width: 100%; display: block; }
+  .error { background: var(--fail-bg); color: var(--fail); border-radius: 8px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
+  .progress { margin-top: 12px; font-size: 14px; color: var(--muted); }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+  .bar i { display: block; height: 100%; width: 30%; background: var(--primary); animation: slide 1.4s ease-in-out infinite; }
+  @keyframes slide { from { margin-left: -30%; } to { margin-left: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .bar i { animation: none; width: 100%; } }
+  .history button { width: 100%; text-align: left; margin-top: 6px; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .history button[aria-current=true] { border-color: var(--primary); }
+  .empty { color: var(--muted); text-align: center; padding: 60px 20px; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .b-ok, .b-pass, .b-approved, .b-passed { background: var(--ok-bg); color: var(--ok); }
+  .b-check, .b-needs_review { background: var(--check-bg); color: var(--check); }
+  .b-missing, .b-skip, .b-processing { background: var(--miss-bg); color: var(--miss); }
+  .b-fail, .b-failed, .b-reprocess { background: var(--fail-bg); color: var(--fail); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.flag { background: var(--check-bg); }
+  .note { color: var(--muted); font-size: 12px; }
+  .scroll { overflow-x: auto; }
+  .checks li { margin: 6px 0; list-style: none; display: flex; gap: 8px; align-items: baseline; }
+  .checks { padding: 0; margin: 0; }
+  .warn li { margin: 4px 0; font-size: 13px; }
+  details summary { cursor: pointer; font-weight: 600; }
+  pre { font: 12px/1.45 var(--mono); background: var(--bg); padding: 12px; border-radius: 8px; overflow: auto; max-height: 480px; }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-top: 14px; border-bottom: 1px solid var(--line); }
+  .tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 8px 12px; font-weight: 600; color: var(--muted); }
+  .tabs button[aria-selected=true] { color: var(--text); border-bottom-color: var(--primary); }
+  /* Purchase form */
+  :root { --fx-bg: #f0f7f1; --fx-line: #b7d7c0; --fx-text: #2f7a4b; --user-bg: #ffffff; }
+  @media (prefers-color-scheme: dark) { :root { --fx-bg: #0f2418; --fx-line: #1f5133; --fx-text: #86efac; --user-bg: #0b1120; } }
+  .panel.form { padding: 0; overflow: hidden; }
+  .panel.form > h2.sec { margin: 0; padding: 14px 18px; background: var(--bg); border-bottom: 1px solid var(--line); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+  .panel.form > .scroll, .panel.form > .tools { padding: 0 12px; }
+  .panel.form > .tools { padding-bottom: 12px; align-items: center; }
+  .groups { display: flex; flex-wrap: wrap; gap: 8px 28px; padding: 14px 18px 18px; }
+  .group { flex: 1 1 100%; min-width: 0; }
+  .group.half { flex: 1 1 calc(50% - 14px); min-width: 300px; }
+  .group h3 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 6px 0 8px; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 16px; }
+  .fields.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ff { display: flex; flex-direction: column; min-width: 0; }
+  .ff.wide { grid-column: 1 / -1; }
+  .ff label { font-size: 13px; margin-bottom: 4px; }
+  .fx { color: var(--fx-text); font-style: italic; font-weight: 700; }
+  input.fi, .grid input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--user-bg); color: var(--text); font: 14px system-ui, "Segoe UI", sans-serif; min-height: 40px; }
+  .fi.formula, .grid input.formula { background: var(--fx-bg); border: 1px dashed var(--fx-line); }
+  .fi.check, .grid input.check { background: var(--check-bg); border: 1px solid #d97706; }
+  .fi:focus, .grid input:focus { outline: 3px solid var(--focus); outline-offset: 0; }
+  .why { color: var(--check); font-size: 12px; margin-top: 3px; }
+  .hintline { color: var(--primary); font-size: 12px; margin-top: 3px; }
+  .grid { font-size: 13px; }
+  .grid th { white-space: nowrap; text-transform: uppercase; letter-spacing: .04em; background: var(--bg); position: sticky; top: 0; }
+  .grid td { padding: 4px; border-bottom: 1px solid var(--line); }
+  .grid input { min-height: 34px; padding: 6px 8px; font-size: 13px; }
+  .grid input.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .grid .del { min-height: 34px; padding: 4px 10px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 0 0 12px 2px; }
+  .legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; border: 1px solid var(--line); background: var(--user-bg); }
+  .legend .sw.check { background: var(--check-bg); border-color: #d97706; }
+  .legend .sw.formula { background: var(--fx-bg); border: 1px dashed var(--fx-line); }
+  .actionbar { position: sticky; bottom: 0; display: flex; gap: 10px; align-items: center; padding: 12px 16px; margin-top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 -4px 12px rgba(15, 23, 42, .06); }
+  .actionbar .spacer { flex: 1; }
+  .primary-sm { background: #14532d; border-color: #14532d; color: #fff; font-weight: 600; }
+  /* ERP-style invoice entry (same layout as the purchase application) */
+  :root { --erp: #14532d; --erp-soft: #ecfdf3; --warn-bg: #fffbeb; --warn-line: #fcd34d; }
+  @media (prefers-color-scheme: dark) { :root { --erp: #22c55e; --erp-soft: #052e16; --warn-bg: #1f1606; --warn-line: #92400e; } }
+  .erp-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 4px 2px 10px; }
+  .erp-head h2 { font-size: 22px; margin: 0; letter-spacing: .01em; }
+  .erp-head .meta { color: var(--muted); font-size: 13px; }
+  .erp-head .links { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .erp-head .links button { font-size: 13px; padding: 6px 10px; }
+  .steps { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding: 0 2px 12px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .steps span { display: inline-flex; align-items: center; gap: 6px; }
+  .steps i { font-style: normal; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); display: inline-grid; place-items: center; font-size: 11px; }
+  .steps .on { color: var(--text); font-weight: 600; }
+  .steps .on i { border: 2px solid var(--erp); color: var(--erp); }
+  .steps b { width: 26px; height: 1px; background: var(--line); display: inline-block; }
+  .checkbox-panel { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; }
+  .checkbox-panel.clean { background: var(--erp-soft); border-color: var(--fx-line); }
+  .checkbox-panel .top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .checkbox-panel h3 { margin: 0 0 6px; font-size: 14px; color: var(--check); }
+  .checkbox-panel.clean h3 { color: var(--ok); }
+  .checkbox-panel .via { font-size: 12px; color: var(--muted); }
+  .checkbox-panel .via b { color: var(--fail); }
+  .checkbox-panel ul { margin: 0 0 10px; padding-left: 20px; font-size: 13px; }
+  .checkbox-panel li { margin: 2px 0; }
+  .checkbox-panel .again { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .etabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .etabs button { font-weight: 600; font-size: 13px; padding: 8px 14px; min-height: 40px; border-radius: 8px; }
+  .etabs button[aria-selected=true] { background: var(--erp); border-color: var(--erp); color: #fff; }
+  .etabs button.flagged:not([aria-selected=true]) { border-color: #ea580c; color: #c2410c; }
+  .etabs button .cnt { display: inline-block; margin-left: 6px; font-size: 11px; padding: 0 6px; border-radius: 999px; background: #fed7aa; color: #9a3412; }
+  .etabs button[aria-selected=true] .cnt { background: rgba(255, 255, 255, .25); color: #fff; }
+  .etabs button[aria-disabled=true] { border-style: dashed; color: var(--muted); cursor: not-allowed; }
+  .sechead { display: flex; align-items: center; gap: 12px; margin: 0; padding: 14px 18px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .sechead h2 { margin: 0; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+  .sechead .mid { margin: 0 auto; font-size: 12px; color: var(--muted); }
+  .sechead .recalc { border: 0; background: none; color: var(--erp); font-size: 12px; font-weight: 600; padding: 4px 6px; }
+  .grid tr.fillrow td { background: var(--bg); }
+  .fillbox { display: flex; gap: 4px; }
+  .fillbox input { min-height: 30px !important; }
+  .fillbox button { padding: 2px 8px; min-height: 30px; }
+  .sumline { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding: 10px 14px; border-top: 1px solid var(--line); }
+  .sumline b { color: var(--text); }
+  .sumline .spacer { flex: 1; }
+  .rail { display: none; }
+  main.collapsed .rail { display: flex; position: fixed; left: 0; top: 120px; z-index: 5; writing-mode: vertical-rl; transform: rotate(180deg);
+    padding: 12px 6px; border-radius: 0 8px 8px 0; font-size: 12px; font-weight: 700; letter-spacing: .08em; background: var(--panel); }
+  .actionbar label.train { display: flex; gap: 6px; align-items: center; font-weight: 400; font-size: 13px; margin: 0; }
+  /* Live scan overlay */
+  body.scanning > main, body.scanning > header { filter: blur(3px); }
+  .scan { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: center; overflow-y: auto;
+    background: rgba(6, 40, 30, .62); padding: 28px 16px; }
+  .scan[hidden], .scan [hidden], .scan-pill[hidden] { display: none !important; }  /* display rules below would override "hidden" */
+  .scan-stage { display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(640px, 100%); margin: auto; }
+  .scan-doc { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .scan-page { position: relative; border-radius: 10px; overflow: hidden; background: #fff;
+    border: 1px solid rgba(110, 231, 183, .55); box-shadow: 0 18px 50px rgba(0, 0, 0, .45); }
+  .scan-page img { display: block; max-height: 56vh; max-width: min(100%, 520px); width: auto; }
+  @media (max-height: 760px) { .scan-page img { max-height: 46vh; } }
+  .scan-ph { width: 300px; height: 420px; display: grid; place-items: center; color: #64748b; font-weight: 700; letter-spacing: .1em; }
+  .scan-region { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden;
+    border: 2px solid #34d399; border-radius: 4px; box-shadow: 0 0 0 3000px rgba(6, 40, 30, .28), 0 0 18px rgba(52, 211, 153, .55);
+    transition: left .6s ease, top .6s ease, width .6s ease, height .6s ease; }
+  .scan-line { position: absolute; left: 0; right: 0; height: 36%; top: -36%;
+    background: linear-gradient(to bottom, rgba(52, 211, 153, 0), rgba(52, 211, 153, .32));
+    border-bottom: 2px solid #6ee7b7; animation: sweep 2.4s ease-in-out infinite; }
+  @keyframes sweep { from { top: -36%; } to { top: 100%; } }
+  .scan.finished .scan-line, .scan.failed .scan-line { display: none; }
+  .scan.finished .scan-region { border-color: #86efac; box-shadow: 0 0 0 3000px rgba(6, 40, 30, 0); }
+  .scan.failed .scan-region { border-color: #fca5a5; }
+  .scan-status { margin: 16px 0 2px; color: #fff; font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .scan-sub { margin: 0; color: #d1fae5; font-size: 13px; text-align: center; max-width: 560px; }
+  .pulse { width: 9px; height: 9px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 0 rgba(52, 211, 153, .7); animation: pulse 1.6s infinite; display: inline-block; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); } 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); } }
+  .dots::after { content: "…"; animation: dots 1.4s steps(4) infinite; display: inline-block; width: 1.2em; overflow: hidden; vertical-align: bottom; }
+  @keyframes dots { from { width: 0; } to { width: 1.2em; } }
+  .scan.finished .dots, .scan.failed .dots, .scan.finished .pulse, .scan.failed .pulse { display: none; }
+  .scan-btn { margin-top: 12px; background: rgba(255, 255, 255, .1); color: #ecfdf5; border-color: rgba(255, 255, 255, .3); min-height: 40px; }
+  .scan-feed { width: 100%; margin-top: 10px; background: rgba(3, 22, 16, .72); border: 1px solid rgba(110, 231, 183, .25);
+    border-radius: 12px; color: #ecfdf5; display: flex; flex-direction: column; height: 24vh; min-height: 130px; overflow: hidden; }
+  .scan-feed header { display: flex; justify-content: space-between; padding: 8px 14px; font-size: 13px; border-bottom: 1px solid rgba(110, 231, 183, .2); background: none; filter: none; }
+  .scan-feed header span { font-variant-numeric: tabular-nums; color: #a7f3d0; }
+  .scan-feed ol { list-style: none; margin: 0; padding: 8px 10px 12px; overflow-y: auto; flex: 1; }
+  .ev { display: grid; grid-template-columns: 38px 1fr; gap: 6px; padding: 6px 4px 6px 16px; font-size: 13px; line-height: 1.45;
+    position: relative; animation: evin .35s ease both; border-radius: 6px; }
+  .ev::before { content: ""; position: absolute; left: 4px; top: 12px; width: 7px; height: 7px; border-radius: 50%; background: #6ee7b7; }
+  .ev.lvl-ok::before { background: #4ade80; }
+  .ev.lvl-warn::before { background: #fbbf24; }
+  .ev.lvl-warn span { color: #fde68a; }
+  .ev time { color: #6ee7b7; font-variant-numeric: tabular-nums; font-size: 12px; padding-top: 1px; }
+  .ev:last-child { background: rgba(52, 211, 153, .1); }
+  @keyframes evin { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .scan-pill { position: fixed; right: 18px; bottom: 18px; z-index: 40; display: flex; align-items: center; gap: 10px; max-width: min(520px, calc(100vw - 36px));
+    background: #064e3b; color: #ecfdf5; border-color: #065f46; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); min-height: 44px; }
+  .scan-pill #scan-pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { .scan-line, .pulse, .dots::after, .ev { animation: none; } .scan-line { display: none; } .scan-region { transition: none; } }
+  /* Pipeline log (Extraction details tab) */
+  .log li { list-style: none; display: grid; grid-template-columns: 44px 1fr; gap: 6px; font-size: 13px; padding: 3px 0; }
+  .log { padding: 0; margin: 0; }
+  .log time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .log .lvl-warn span { color: var(--check); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Invoice Tester</h1>
+  <span class="hint">Invoice Entry, laid out as in the purchase application · PaddleOCR-VL + Qwen3-VL</span>
+  <span class="api" id="api"><span class="dot" id="apidot"></span><span id="apitext">Checking the API…</span></span>
+</header>
+
+<main>
+  <button type="button" class="rail" id="rail" aria-label="Show the invoice image">» Invoice image</button>
+  <section aria-label="Upload">
+    <div class="panel">
+      <h2>Extract an invoice</h2>
+      <label for="key">API key</label>
+      <div class="row">
+        <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk_live_…">
+        <button type="button" id="showkey" aria-pressed="false" aria-controls="key">Show</button>
+      </div>
+      <p class="hint">Create one on the dashboard's API keys page. Kept only in this tab.</p>
+
+      <label class="drop" id="drop" for="file">
+        <input id="file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif">
+        <span id="droptext">Drop an invoice here or click to choose<br><small>PDF, JPEG, PNG, WebP, GIF</small></span>
+      </label>
+      <div class="preview" id="preview" hidden><img id="previewimg" alt="Selected invoice"></div>
+
+      <button class="primary" id="go" type="button">Extract fields</button>
+      <div id="status" role="status" aria-live="polite"></div>
+      <p class="hint" style="margin-top:12px">Or <label for="openjson" style="display:inline;font-weight:600;color:var(--primary);cursor:pointer;font-size:12px">open a saved result (.json)</label> downloaded earlier with "Download JSON".
+        <input id="openjson" type="file" accept="application/json,.json" class="sr"></p>
+    </div>
+
+    <div class="panel history" id="historypanel" hidden>
+      <h2>This session</h2>
+      <div id="history"></div>
+    </div>
+  </section>
+
+  <section aria-label="Result" id="result">
+    <div class="panel empty" id="empty">Results appear here: every field with its status, the line items and the validation checks.<br>Reading takes about 1-2 minutes per page on the GPU (5-12 minutes on a CPU).</div>
+  </section>
+</main>
+
+<div class="scan" id="scan" hidden role="dialog" aria-modal="true" aria-labelledby="scan-title">
+  <div class="scan-stage">
+    <div class="scan-doc">
+      <div class="scan-page">
+        <img id="scan-img" alt="The invoice being read">
+        <div class="scan-ph" id="scan-ph" hidden>PDF</div>
+        <div class="scan-region" id="scan-region"><div class="scan-line"></div></div>
+      </div>
+      <p class="scan-status"><span class="pulse" aria-hidden="true"></span><b id="scan-title">Reading invoice with vision</b><span class="dots" aria-hidden="true"></span></p>
+      <p class="scan-sub"><span id="scan-file"></span> · <span id="scan-step"></span></p>
+    </div>
+    <section class="scan-feed" aria-label="What the pipeline is doing">
+      <header><b>What the pipeline is doing</b><span id="scan-clock">0:00</span></header>
+      <ol id="scan-events" aria-live="polite"></ol>
+    </section>
+    <button type="button" id="scan-bg" class="scan-btn">Run in background</button>
+  </div>
+</div>
+<button type="button" class="scan-pill" id="scan-pill" hidden><span class="pulse" aria-hidden="true"></span><span id="scan-pill-text">Reading…</span> <u>Show</u></button>
+
+<script>
+const FIELDS = [
+  ["Invoice", [["invoice_number", "Invoice number"], ["invoice_date", "Date"], ["place_of_supply", "Place of supply"],
+               ["currency", "Currency"], ["delivery_note", "Delivery note"], ["payment_terms", "Payment terms"]]],
+  ["Seller", [["vendor_name", "Name"], ["vendor_address", "Address"], ["vendor_gstin", "GSTIN"]]],
+  ["Buyer", [["buyer_name", "Name"], ["buyer_address", "Address"], ["buyer_gstin", "GSTIN"]]],
+  ["Totals", [["total_quantity", "Total quantity"], ["subtotal", "Subtotal (taxable)"], ["discount", "Discount"],
+              ["cgst", "CGST"], ["sgst", "SGST"], ["igst", "IGST"], ["round_off", "Round off"], ["total_amount", "Total amount"]]],
+];
+const ITEM_COLUMNS = [["line_number", "#", true], ["description", "Description"], ["design", "Design"], ["size", "Size"], ["hsn_sac", "HSN/SAC"], ["quantity", "Qty", true],
+  ["unit", "Unit"], ["mrp", "MRP", true], ["rate", "Rate", true], ["discount_percent", "Disc %", true], ["tax_rate", "GST %", true], ["taxable_value", "Amount", true]];
+const STATUS_TEXT = { ok: "OK", check: "Check", missing: "Missing", pass: "Pass", fail: "Fail", skip: "Skipped",
+  approved: "Approved", needs_review: "Needs review", reprocess: "Reprocess", failed: "Failed", processing: "Processing", passed: "Passed" };
+
+const $ = (id) => document.getElementById(id);
+const runs = [];            // {id, filename, state, started, finished, result, previewUrl}
+let current = null, timer = null;
+
+function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function badge(s) { return `<span class="badge b-${esc(s)}">${esc(STATUS_TEXT[s] || s)}</span>`; }
+function money(v) {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) && /^-?\d+(\.\d+)?$/.test(String(v)) ? n.toLocaleString("en-IN", { minimumFractionDigits: String(v).includes(".") ? 2 : 0, maximumFractionDigits: 4 }) : String(v);
+}
+function clock(ms) { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+
+async function checkApi() {
+  if (location.protocol === "file:") {
+    $("apidot").className = "dot down";
+    $("apitext").textContent = "Opened as a file: open http://localhost:3002 instead";
+    return;
+  }
+  try {
+    const r = await (await fetch("/api/health")).json();
+    $("apidot").className = "dot " + (r.reachable ? "up" : "down");
+    $("apitext").textContent = (r.reachable ? "API ready: " : "API not reachable: ") + r.api;
+  } catch { $("apidot").className = "dot down"; $("apitext").textContent = "Tester server not reachable"; }
+}
+
+$("showkey").onclick = () => {
+  const hidden = $("key").type === "password";
+  $("key").type = hidden ? "text" : "password";
+  $("showkey").textContent = hidden ? "Hide" : "Show";
+  $("showkey").setAttribute("aria-pressed", String(hidden));
+};
+try { $("key").value = sessionStorage.getItem("tester-key") || ""; } catch {}
+$("key").addEventListener("input", () => { try { sessionStorage.setItem("tester-key", $("key").value.trim()); } catch {} });
+
+let chosen = null;
+function choose(file) {
+  chosen = file || null;
+  $("droptext").innerHTML = chosen ? `<b>${esc(chosen.name)}</b><br><small>${(chosen.size / 1024).toFixed(0)} KB, click to change</small>` : "Drop an invoice here or click to choose<br><small>PDF, JPEG, PNG, WebP, GIF</small>";
+  const img = chosen && chosen.type.startsWith("image/");
+  $("preview").hidden = !img;
+  if (img) $("previewimg").src = URL.createObjectURL(chosen);
+}
+$("file").onchange = (e) => choose(e.target.files[0]);
+["dragenter", "dragover"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("over"); }));
+$("drop").addEventListener("drop", e => e.dataTransfer.files[0] && choose(e.dataTransfer.files[0]));
+
+$("openjson").onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const result = JSON.parse(await file.text());
+    if (!result.invoice) throw new Error("not an extraction result (no \"invoice\")");
+    const run = { id: "saved-" + Date.now(), filename: file.name.replace(/\.extraction\.json$|\.json$/, ""), state: "done", result, started: Date.now(), finished: Date.now() };
+    runs.unshift(run);
+    select(run);
+    $("status").innerHTML = "";
+  } catch (err) { showError("Could not open " + file.name + ": " + err.message); }
+  e.target.value = "";
+};
+
+function showError(msg) { $("status").innerHTML = `<div class="error" role="alert">${esc(msg)}</div>`; }
+
+$("go").onclick = async () => {
+  const key = $("key").value.trim();
+  if (!key) return showError("Enter an API key.");
+  if (!chosen) return showError("Choose an invoice file.");
+  $("go").disabled = true;
+  try {
+    const r = await fetch("/api/extract", { method: "POST", body: chosen,
+      headers: { "X-Api-Key": key, "X-Filename": encodeURIComponent(chosen.name), "Content-Type": chosen.type || "application/octet-stream" } });
+    const body = await r.json();
+    if (r.status !== 202) { $("go").disabled = false; return showError(body.error?.message || `HTTP ${r.status}`); }
+    const run = { id: body.id, filename: chosen.name, file: chosen, state: "running", started: Date.now(), previewUrl: $("preview").hidden ? null : $("previewimg").src };
+    runs.unshift(run);
+    select(run);
+    poll(run);
+  } catch (e) {
+    $("go").disabled = false;
+    showError(location.protocol === "file:"
+      ? "This page was opened as a file. Start the tester server and open http://localhost:3002 instead."
+      : "Could not reach the tester server (" + e.message + "). Is it running? Start it with: vision-api\\.venv\\Scripts\\python.exe invoice-tester\\server.py, then reload this page.");
+  }
+};
+
+function poll(run) {
+  clearInterval(timer);
+  scanOpen(run);
+  const tick = async () => {
+    const elapsed = clock(Date.now() - run.started);
+    $("status").innerHTML = `<div class="progress">Reading <b>${esc(run.filename)}</b>… ${elapsed}<div class="bar"><i></i></div></div>`;
+    scanClock(run);
+    try {
+      const job = await (await fetch(`/api/jobs/${run.id}`)).json();
+      run.events = job.events || run.events || [];
+      scanUpdate(run);
+      if (job.state && job.state !== "running") {
+        clearInterval(timer);
+        Object.assign(run, { state: job.state, result: job.result, http: job.http_status, finished: Date.now() });
+        $("go").disabled = false;
+        $("status").innerHTML = run.state === "done" ? `<div class="progress">Done in ${clock(run.finished - run.started)}.</div>` : "";
+        renderHistory();
+        scanFinish(run, () => { if (current === run) render(run); });
+      }
+    } catch {}
+  };
+  tick();
+  timer = setInterval(tick, 1500);
+  renderHistory();
+}
+
+// ---------------------------------------------------------------------------
+// Live scan overlay: the photo, where the pipeline is reading, and its comments
+// ---------------------------------------------------------------------------
+
+let scanRun = null, scanShown = 0;
+
+function scanOpen(run) {
+  scanRun = run;
+  scanShown = 0;
+  $("scan-events").innerHTML = "";
+  $("scan-file").textContent = run.filename;
+  $("scan-step").textContent = "uploading…";
+  const img = $("scan-img");
+  if (run.previewUrl) { img.src = run.previewUrl; img.hidden = false; $("scan-ph").hidden = true; }
+  else { img.removeAttribute("src"); img.hidden = true; $("scan-ph").hidden = false; }
+  scanRegion(null);
+  $("scan").classList.remove("finished", "failed");
+  scanShow(true);
+}
+
+function scanShow(visible) {
+  $("scan").hidden = !visible;
+  $("scan-pill").hidden = visible || !scanRun || scanRun.state !== "running";
+  document.body.classList.toggle("scanning", visible);
+  if (visible) $("scan-bg").focus();
+}
+
+function scanRegion(region) {
+  const [x1, y1, x2, y2] = region || [0, 0, 1, 1];
+  const box = $("scan-region").style;
+  box.left = `${x1 * 100}%`; box.top = `${y1 * 100}%`;
+  box.width = `${Math.max(0.02, x2 - x1) * 100}%`; box.height = `${Math.max(0.02, y2 - y1) * 100}%`;
+}
+
+function scanClock(run) {
+  if (scanRun === run) $("scan-clock").textContent = clock(Date.now() - run.started);
+}
+
+function scanUpdate(run) {
+  if (scanRun !== run) return;
+  const events = run.events || [];
+  const list = $("scan-events");
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+  for (const ev of events.slice(scanShown)) {
+    const li = document.createElement("li");
+    li.className = `ev lvl-${ev.level || "info"}`;
+    li.innerHTML = `<time>${clock((ev.t || 0) * 1000)}</time><span>${esc(ev.text)}</span>`;
+    list.appendChild(li);
+  }
+  scanShown = events.length;
+  const last = events[events.length - 1];
+  const located = [...events].reverse().find(e => e.region);
+  if (last) {
+    $("scan-step").textContent = last.text;
+    $("scan-pill-text").textContent = `${run.filename} · ${last.text}`;
+  }
+  scanRegion(located ? located.region : null);
+  if (atBottom) list.scrollTop = list.scrollHeight;
+}
+
+function scanFinish(run, then) {
+  if (scanRun !== run) return then();
+  const ok = run.state === "done";
+  $("scan").classList.add(ok ? "finished" : "failed");
+  $("scan-title").textContent = ok ? "Invoice read" : "Reading failed";
+  $("scan-step").textContent = ok ? `${run.result.review_status === "approved" ? "Approved" : "Opening the form"} · ${clock(run.finished - run.started)}`
+    : (run.result?.error?.message || "Extraction failed");
+  scanRegion(null);
+  $("scan-pill").hidden = true;
+  const wasOpen = !$("scan").hidden;
+  setTimeout(() => {  // let the final state show briefly, then open the result
+    scanShow(false);
+    $("scan-title").textContent = "Reading invoice with vision";
+    then();
+  }, wasOpen ? (ok ? 1400 : 4000) : 0);
+}
+
+$("scan-bg").onclick = () => scanShow(false);
+$("scan-pill").onclick = () => scanShow(true);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("scan").hidden) scanShow(false); });
+
+function renderHistory() {
+  $("historypanel").hidden = runs.length === 0;
+  $("history").innerHTML = runs.map((r, i) => {
+    const s = r.state === "running" ? badge("processing") : r.state === "error" ? badge("failed") : badge(r.result.review_status);
+    return `<button type="button" data-i="${i}" aria-current="${r === current}"><span>${esc(r.filename)}</span>${s}</button>`;
+  }).join("");
+  $("history").querySelectorAll("button").forEach(b => b.onclick = () => select(runs[+b.dataset.i]));
+}
+
+function select(run) {
+  current = run;
+  history.replaceState(null, "", "#job=" + run.id);
+  renderHistory();
+  render(run);
+}
+
+function render(run) {
+  const out = $("result");
+  if (run.state === "running") {
+    out.innerHTML = `<div class="panel empty">Reading <b>${esc(run.filename)}</b>. The page straightens the photo, locates the item table, reads it in bands, then checks every value.</div>`;
+    return;
+  }
+  if (run.state === "error") {
+    const e = run.result?.error || {};
+    const why = run.http === 401 ? " The key is invalid, revoked or expired." : "";
+    out.innerHTML = `<div class="panel"><h2>${esc(run.filename)}</h2><div class="error" role="alert">${esc(e.message || "Extraction failed")}${esc(why)}${run.result?.request_id ? `<br><small>Request ID: ${esc(run.result.request_id)}</small>` : ""}</div></div>`;
+    return;
+  }
+  const r = run.result;
+  if (run.view !== "details") {
+    out.innerHTML = headHtml(run, r) + formHtml(run);
+    wireHead(run, r);
+    wireForm(run);
+    return;
+  }
+  out.innerHTML = headHtml(run, r) + detailsHtml(run, r);
+  wireHead(run, r);
+}
+
+// Title, invoice number and total, the ERP's step bar, and the links to the other views.
+function headHtml(run, r) {
+  const inv = r.invoice;
+  const name = inv.vendor_name.value || run.filename;
+  const total = inv.total_amount.value;
+  const collapsed = document.querySelector("main").classList.contains("collapsed");
+  const steps = ["Read", "Checked", "Receiving", "Posted", "In stock"].map((s, i) =>
+    `<span class="${i === 0 ? "on" : ""}"><i>${i + 1}</i>${s}</span>`).join("<b></b>");
+  return `<div class="erp-head"><h2>${esc(name)}</h2>
+      ${inv.invoice_number.value ? `<span class="meta">#${esc(inv.invoice_number.value)}</span>` : ""}
+      ${total != null ? `<span class="meta">₹ ${esc(money(Number(total).toFixed(2)))}</span>` : ""}
+      <span class="meta">${badge(r.review_status)}</span>
+      <span class="links">
+        <button type="button" id="widen" aria-pressed="${collapsed}">${collapsed ? "Show invoice image" : "Hide invoice image"}</button>
+        <button type="button" id="viewswitch">${run.view === "details" ? "← Purchase entry" : "Extraction details"}</button>
+      </span></div>
+    <div class="steps" aria-label="Progress">${steps}</div>`;
+}
+
+function wireHead(run, r) {
+  $("widen").onclick = () => { document.querySelector("main").classList.toggle("collapsed"); render(run); };
+  $("viewswitch").onclick = () => { run.view = run.view === "details" ? "form" : "details"; render(run); };
+  if (run.view === "details") {
+    const json = JSON.stringify(r, null, 2);
+    $("dl").onclick = () => download(run.filename.replace(/\.[^.]+$/, "") + ".extraction.json", json, "application/json");
+    $("copy").onclick = async () => { try { await navigator.clipboard.writeText(json); $("copy").textContent = "Copied"; } catch { $("copy").textContent = "Copy failed"; } };
+  }
+}
+
+// The former result view: statistics, every field, items, checks, log and raw text.
+function detailsHtml(run, r) {
+  const inv = r.invoice, v = r.validation || { status: null, checks: [] };
+  const counts = { ok: 0, check: 0, missing: 0 };
+  FIELDS.forEach(([, fs]) => fs.forEach(([k]) => counts[inv[k].status]++));
+  const fails = v.checks.filter(c => c.status === "fail").length;
+  let html = `<div class="panel"><div class="summary">
+    <div class="stat"><span>Review status</span><b>${badge(r.review_status)}</b></div>
+    <div class="stat"><span>Confidence</span><b>${r.confidence == null ? "–" : Math.round(r.confidence * 100) + "%"}</b></div>
+    <div class="stat"><span>Validation</span><b>${badge(v.status || "skip")}</b><span>${v.checks.length - fails - v.checks.filter(c => c.status === "skip").length} passed, ${fails} failed</span></div>
+    <div class="stat"><span>Fields</span><b>${counts.ok} OK</b><span>${counts.check} to check, ${counts.missing} missing</span></div>
+    <div class="stat"><span>Line items</span><b>${inv.items.length}</b></div>
+    <div class="stat"><span>Time</span><b>${clock(r.processing_ms)}</b><span>${r.pages} page(s)</span></div>
+  </div>
+  <div class="tools"><button type="button" id="dl">Download JSON</button><button type="button" id="copy">Copy JSON</button></div></div>`;
+  html += `<div class="panel"><h2>Fields</h2><div class="scroll"><table><thead><tr><th>Group</th><th>Field</th><th>Value</th><th>Status</th><th>Note</th></tr></thead><tbody>`;
+  FIELDS.forEach(([group, fs]) => fs.forEach(([k, label], i) => {
+    const f = inv[k];
+    html += `<tr><td>${i === 0 ? `<b>${esc(group)}</b>` : ""}</td><td>${esc(label)}</td><td class="${f.status === "check" ? "flag" : ""}">${esc(money(f.value))}</td><td>${badge(f.status)}</td><td class="note">${esc(f.note || "")}</td></tr>`;
+  }));
+  html += `</tbody></table></div></div>`;
+  html += `<div class="panel"><h2>Line items (${inv.items.length})</h2>`;
+  if (inv.items.length) {
+    html += `<div class="scroll"><table><thead><tr>${ITEM_COLUMNS.map(([, h, n]) => `<th${n ? ' style="text-align:right"' : ""}>${h}</th>`).join("")}</tr></thead><tbody>`;
+    inv.items.forEach(it => {
+      html += "<tr>" + ITEM_COLUMNS.map(([k, , n]) => {
+        const c = it[k] || {}; const cls = [n ? "num" : "", c.status === "check" ? "flag" : ""].join(" ").trim();
+        return `<td class="${cls}" title="${esc(c.note || "")}">${esc(money(c.value))}</td>`;
+      }).join("") + "</tr>";
+    });
+    html += `</tbody></table></div>`;
+  } else html += `<p class="note">No line items were read.</p>`;
+  html += `</div>`;
+  html += `<div class="panel"><h2>Validation checks</h2><ul class="checks">` +
+    v.checks.map(c => `<li>${badge(c.status)} <span><b>${esc(c.name)}</b>: ${esc(c.message)}</span></li>`).join("") + `</ul></div>`;
+  if (run.events?.length) html += `<div class="panel"><h2>Pipeline log</h2><ol class="log">${run.events.map(ev =>
+    `<li class="lvl-${esc(ev.level)}"><time>${clock((ev.t || 0) * 1000)}</time><span>${esc(ev.text)}</span></li>`).join("")}</ol></div>`;
+  if (r.warnings?.length) html += `<div class="panel"><h2>Warnings</h2><ul class="warn">${r.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>`;
+  html += `<div class="panel"><details><summary>OCR text and raw JSON</summary><h2 style="margin-top:12px">OCR text</h2><pre>${esc(r.raw_text)}</pre><h2>JSON</h2><pre>${esc(JSON.stringify(r, null, 2))}</pre></details></div>`;
+  return html;
+}
+
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+}
+
+// ---------------------------------------------------------------------------
+// Purchase entry (layout and tabs from form_fields.json, as in the ERP)
+// ---------------------------------------------------------------------------
+
+let FORM = null;
+const formReady = fetch("/form_fields.json").then(r => r.json()).then(f => { FORM = f; }).catch(() => { FORM = null; });
+
+const num = (v) => { const n = parseFloat(String(v ?? "").replace(/,/g, "")); return Number.isFinite(n) ? n : null; };
+const fmt = (n, dp = 2) => n == null ? "" : String(Math.round(n * 10 ** dp) / 10 ** dp);
+const inr = (n) => n == null ? "–" : Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function extracted(r, source) {
+  // {value, status, note} for "invoice.x" / "details.x"; null for user fields and formulas.
+  if (!source || source.startsWith("formula.")) return null;
+  const [scope, key] = source.split(".");
+  const field = (scope === "invoice" ? r.invoice : r.details || {})[key];
+  return field ? { value: field.value, status: field.status, note: field.note } : null;
+}
+
+function invoiceGstRate(state) {
+  const f = state.fields;
+  const igst = num(f.igst_rate), cgst = num(f.cgst_rate), sgst = num(f.sgst_rate);
+  return igst || ((cgst || 0) + (sgst || 0)) || null;
+}
+
+function buildForm(r) {
+  const state = { fields: {}, meta: {}, items: [], fill: {}, train: true };
+  FORM.sections.forEach(s => (s.groups || []).forEach(g => g.fields.forEach(f => {
+    const x = extracted(r, f.source);
+    state.fields[f.key] = x && x.value != null ? String(x.value) : "";
+    state.meta[f.key] = x ? { status: x.status, note: x.note } : { status: f.source ? "formula" : "user" };
+  })));
+  r.invoice.items.forEach(it => {
+    const row = { cells: {}, meta: {}, printed: num(it.taxable_value.value), touched: false };
+    FORM.items.columns.forEach(c => {
+      const cell = c.source && !c.source.startsWith("formula.") ? it[c.source] : null;
+      let value = cell && cell.value != null ? String(cell.value) : "";
+      if (c.key === "uom") value = value.toUpperCase();  // the ERP shows units in capitals (PCS)
+      row.cells[c.key] = value;
+      row.meta[c.key] = cell ? { status: cell.status, note: cell.note } : { status: c.source ? "formula" : "user" };
+    });
+    state.items.push(row);
+  });
+  recompute(state);
+  return state;
+}
+
+function recompute(state) {
+  const f = state.fields;
+  const gross = num(f.sub_total), disc = num(f.special_discount);
+  f.special_discount_pct = gross && disc ? fmt(disc * 100 / gross) : f.special_discount_pct || "";
+  const defaultGst = invoiceGstRate(state);
+  state.items.forEach(row => {
+    const c = row.cells, qty = num(c.qty), rate = num(c.rate), dp = num(c.discount_pct) || 0;
+    const computed = qty != null && rate != null ? qty * rate * (1 - dp / 100) : null;
+    let taxable = row.printed;
+    row.mismatch = null;
+    row.computed = computed;
+    if (row.touched || taxable == null) taxable = computed;
+    else if (computed != null && Math.abs(computed - taxable) > 1) row.mismatch = `qty x rate x (1 - disc) gives ${fmt(computed)}; the invoice prints ${fmt(taxable)}`;
+    c.taxable = fmt(taxable);
+    const gst = num(c.gst_pct) ?? defaultGst;
+    c.amount = taxable != null && gst != null ? fmt(taxable * (1 + gst / 100)) : "";
+    const mrp = num(c.mrp);
+    c.sell_price = mrp != null ? fmt(mrp * (1 - (num(c.sale_disc_pct) || 0) / 100)) : "";
+  });
+  const sum = (fn) => state.items.reduce((s, row) => s + (fn(row) || 0), 0);
+  state.lineTaxable = sum(row => num(row.cells.taxable));
+  state.lineQty = sum(row => num(row.cells.qty));
+  // "Σ MRP − cost": what the lines are worth at MRP less what they cost (qty x rate).
+  state.lineMrp = sum(row => (num(row.cells.mrp) ?? 0) * (num(row.cells.qty) ?? 0));
+  state.lineCost = sum(row => (num(row.cells.rate) ?? 0) * (num(row.cells.qty) ?? 0));
+}
+
+function fieldHtml(f, state) {
+  const meta = state.meta[f.key] || {}, value = state.fields[f.key] ?? "";
+  const cls = ["fi", f.formula ? "formula" : "", meta.status === "check" ? "check" : "", meta.status === "user" ? "user" : ""].join(" ");
+  const title = meta.note ? ` title="${esc(meta.note)}"` : "";
+  const type = f.type === "date" ? "date" : "text";
+  const mode = f.type === "number" ? ' inputmode="decimal"' : "";
+  return `<div class="ff${f.wide ? " wide" : ""}"><label for="f-${f.key}">${esc(f.label)}${f.formula ? ' <span class="fx" title="calculated">ƒ</span>' : ""}</label>
+    <input id="f-${f.key}" data-key="${f.key}" class="${cls}" type="${type}"${mode} value="${esc(value)}"${title}>
+    ${meta.status === "check" ? `<small class="why">${esc(meta.note || "check this value")}</small>` : f.hint ? `<small class="hintline">${esc(f.hint)}</small>` : ""}</div>`;
+}
+
+// The checks panel: every line whose arithmetic does not hold, then the other failed checks.
+function checkList(run) {
+  const r = run.result, state = run.form, list = [];
+  state.items.forEach((row, i) => {
+    if (!row.mismatch) return;
+    const desc = row.cells.description ? ` (${row.cells.description})` : "";
+    list.push(`Line ${row.cells.line || i + 1}${desc}: qty × rate − disc = ${inr(row.computed)} ≠ amount ${inr(row.printed)}`);
+  });
+  (r.validation?.checks || []).filter(c => c.status === "fail" && c.id !== "line_arithmetic")
+    .forEach(c => list.push(`${c.name}: ${c.message}`));
+  const cols = Object.fromEntries(FORM.items.columns.map(c => [c.key, c.label]));
+  state.items.forEach((row, i) => Object.entries(row.meta).forEach(([key, m]) => {
+    if (m.status !== "check") return;
+    const desc = row.cells.description ? ` (${row.cells.description})` : "";
+    list.push(`Line ${row.cells.line || i + 1}${desc}: ${cols[key] || key}: ${m.note || "check this value"}`);
+  }));
+  const flagged = Object.entries(state.meta).filter(([, m]) => m.status === "check").length;
+  if (flagged) list.push(`${flagged} field(s) marked to check (yellow)`);
+  if (r.warnings?.some(w => /read by .*(8B|fallback)/i.test(w))) list.push("some values were read by the fallback vision model");
+  return list;
+}
+
+function checksHtml(run) {
+  const list = checkList(run), conf = run.result.confidence;
+  const confText = conf == null ? "" : `via extraction · confidence <b>${Math.round(conf * 100)}%</b>`;
+  const again = run.file ? `<div class="again"><button type="button" id="again">Read it again</button>
+      <span>Replaces this reading with a fresh one from the same file. Anything typed here by hand and not exported is lost.</span></div>` : "";
+  if (!list.length) return `<div class="checkbox-panel clean"><div class="top"><h3>All checks pass</h3><span class="via">${confText}</span></div>${again}</div>`;
+  return `<div class="checkbox-panel" role="region" aria-label="Checks"><div class="top"><h3>${list.length} check(s)</h3><span class="via">${confText}</span></div>
+    <ul>${list.map(t => `<li>${esc(t)}</li>`).join("")}</ul>${again}</div>`;
+}
+
+// Flagged inputs per section (yellow fields, lines that do not add up): the tab's warning count.
+function sectionFlags(section, state) {
+  if (section.items) return state.items.reduce((n, row) => n + Object.values(row.meta).filter(m => m.status === "check").length + (row.mismatch ? 1 : 0), 0);
+  return (section.groups || []).reduce((n, g) => n + g.fields.filter(f => state.meta[f.key]?.status === "check").length, 0);
+}
+
+function itemsHtml(state) {
+  const cols = FORM.items.columns;
+  let h = `<div class="scroll"><table class="grid"><thead><tr>${cols.map(c => `<th style="min-width:${c.width || 90}px">${esc(c.label)}${c.formula || c.fx ? ' <span class="fx">ƒ</span>' : ""}</th>`).join("")}<th></th></tr>
+    <tr class="fillrow">${cols.map(c => c.fill ? `<td><div class="fillbox"><input data-fill="${c.key}" aria-label="Set ${esc(c.label)} on every line" placeholder="${esc(c.fill)}" value="${esc(state.fill[c.key] || "")}"${c.type === "number" ? ' inputmode="decimal" class="n"' : ""}><button type="button" data-fillgo="${c.key}" title="Set on every line" aria-label="Set ${esc(c.label)} on every line">↓</button></div></td>` : "<td></td>").join("")}<td></td></tr></thead><tbody>`;
+  state.items.forEach((row, i) => {
+    h += `<tr>${cols.map(c => {
+      const meta = row.meta[c.key] || {};
+      const flag = meta.status === "check" || (c.key === "taxable" && row.mismatch);
+      const note = c.key === "taxable" && row.mismatch ? row.mismatch : meta.note;
+      return `<td><input data-row="${i}" data-col="${c.key}" aria-label="Line ${i + 1} ${esc(c.label)}" class="${[c.formula ? "formula" : "", flag ? "check" : "", c.type === "number" ? "n" : ""].join(" ")}" value="${esc(row.cells[c.key] ?? "")}"${note ? ` title="${esc(note)}"` : ""}${c.formula ? " readonly" : ""}></td>`;
+    }).join("")}<td><button type="button" class="del" data-del="${i}" aria-label="Remove line ${i + 1}">×</button></td></tr>`;
+  });
+  h += `</tbody></table></div><div class="sumline" id="sumline">${sumLine(state)}</div>`;
+  return h;
+}
+
+function sumLine(state) {
+  return `<span><b>${state.items.length}</b> lines</span><span>Σ qty <b>${fmt(state.lineQty, 3)}</b></span>
+    <span>Σ MRP − cost <b>${inr(state.lineMrp - state.lineCost)}</b></span><span>Σ value <b>${inr(state.lineTaxable)}</b></span>
+    <span class="spacer"></span><button type="button" id="addrow">+ add line</button>`;
+}
+
+function groupsHtml(section, state) {
+  let h = `<div class="groups">`;
+  section.groups.forEach(g => {
+    h += `<div class="group${g.half ? " half" : ""}">${g.title ? `<h3>${esc(g.title)}</h3>` : ""}<div class="fields${g.columns ? " c" + g.columns : ""}">${g.fields.map(f => fieldHtml(f, state)).join("")}</div></div>`;
+  });
+  return h + `</div>`;
+}
+
+function formHtml(run) {
+  if (!FORM) return `<div class="panel"><div class="error">Could not load form_fields.json from the tester server.</div></div>`;
+  run.form = run.form || buildForm(run.result);
+  const state = run.form;
+  const tabs = FORM.tabs || FORM.sections.map(s => ({ title: s.title, sections: [s.title] }));
+  const sectionsOf = (tab) => tab.sections.map(t => FORM.sections.find(s => s.title === t)).filter(Boolean);
+  if (run.tab == null || tabs[run.tab]?.disabled) run.tab = 0;
+  let h = checksHtml(run);
+  h += `<div class="etabs" role="tablist" aria-label="Purchase entry">${tabs.map((t, i) => {
+    const flags = sectionsOf(t).reduce((n, s) => n + sectionFlags(s, state), 0);
+    return `<button type="button" role="tab" data-tab="${i}" aria-selected="${i === run.tab}"${t.disabled ? ` aria-disabled="true" title="${esc(t.disabled)}"` : ""} class="${flags ? "flagged" : ""}">${esc(t.title)}${flags ? `<span class="cnt" aria-label="${flags} to check">⚠ ${flags}</span>` : ""}</button>`;
+  }).join("")}</div>`;
+  const tab = tabs[run.tab];
+  const secs = sectionsOf(tab);
+  h += `<div class="panel form" role="tabpanel" aria-label="${esc(tab.title)}"><div class="sechead"><h2>${esc(tab.title)}</h2>`;
+  if (secs.some(s => s.items)) h += `<span class="mid">taxable base ₹ ${inr(state.lineTaxable)}</span><button type="button" class="recalc" id="recalc">⟳ recalculate</button>`;
+  h += `</div>`;
+  secs.forEach(s => { h += s.items ? itemsHtml(state) : groupsHtml(s, state); });
+  h += `</div>`;
+  h += `<div class="legend" style="margin-top:12px"><span><i class="sw check"></i>check this value</span><span><i class="sw formula"></i>ƒ calculated</span><span><i class="sw user"></i>not on the invoice: fill in</span></div>`;
+  const grn = tabs.findIndex(t => /grn/i.test(t.title));
+  h += `<div class="actionbar"><label class="train"><input type="checkbox" id="train"${state.train ? " checked" : ""}> Train this supplier's format on save</label>
+    <button type="button" id="reset">Reset to extracted</button><span class="spacer"></span>
+    <button type="button" id="csv">Export CSV</button><button type="button" id="formjson" class="primary-sm">Export JSON</button>
+    ${grn >= 0 && grn !== run.tab ? `<button type="button" id="togrn">Create GRN →</button>` : ""}</div>`;
+  return h;
+}
+
+function refreshComputed(state) {
+  recompute(state);
+  document.querySelectorAll("input[data-col]").forEach(el => {
+    const row = state.items[+el.dataset.row], col = el.dataset.col;
+    if (el.readOnly && row) el.value = row.cells[col] ?? "";
+    if (col === "taxable" && row) {
+      el.classList.toggle("check", !!row.mismatch);
+      el.title = row.mismatch || "";
+    }
+  });
+  const pct = $("f-special_discount_pct");
+  if (pct) pct.value = state.fields.special_discount_pct;
+  if ($("sumline")) { $("sumline").innerHTML = sumLine(state); wireAddRow(); }
+  document.querySelectorAll(".sechead .mid").forEach(el => { el.textContent = `taxable base ₹ ${inr(state.lineTaxable)}`; });
+}
+
+let currentRunForAdd = null;
+function wireAddRow() {
+  const run = currentRunForAdd, state = run?.form;
+  if (!$("addrow") || !state) return;
+  $("addrow").onclick = () => {
+    const cells = {}, meta = {};
+    FORM.items.columns.forEach(c => { cells[c.key] = ""; meta[c.key] = { status: "user" }; });
+    cells.line = String(state.items.length + 1);
+    state.items.push({ cells, meta, printed: null, touched: true });
+    render(run);
+  };
+}
+
+function wireForm(run) {
+  const state = run.form;
+  if (!state) return;
+  currentRunForAdd = run;
+  document.querySelectorAll("button[data-tab]").forEach(b => b.onclick = () => {
+    if (b.getAttribute("aria-disabled") === "true") return;
+    run.tab = +b.dataset.tab; render(run);
+  });
+  document.querySelectorAll("input[data-key]").forEach(el => el.addEventListener("input", () => {
+    state.fields[el.dataset.key] = el.value;
+    refreshComputed(state);
+  }));
+  document.querySelectorAll("input[data-col]").forEach(el => el.addEventListener("input", () => {
+    const row = state.items[+el.dataset.row];
+    row.cells[el.dataset.col] = el.value;
+    if (["qty", "rate", "discount_pct"].includes(el.dataset.col)) row.touched = true;
+    refreshComputed(state);
+  }));
+  document.querySelectorAll("input[data-fill]").forEach(el => el.addEventListener("input", () => { state.fill[el.dataset.fill] = el.value; }));
+  document.querySelectorAll("button[data-fillgo]").forEach(b => b.onclick = () => {
+    const col = b.dataset.fillgo, value = state.fill[col] ?? "";
+    state.items.forEach(row => {
+      row.cells[col] = value;
+      row.meta[col] = { status: "user" };
+      if (["rate", "discount_pct"].includes(col)) row.touched = true;
+    });
+    render(run);
+  });
+  document.querySelectorAll("button[data-del]").forEach(b => b.onclick = () => { state.items.splice(+b.dataset.del, 1); render(run); });
+  wireAddRow();
+  if ($("recalc")) $("recalc").onclick = () => { refreshComputed(state); render(run); };
+  if ($("togrn")) $("togrn").onclick = () => { run.tab = (FORM.tabs || []).findIndex(t => /grn/i.test(t.title)); render(run); };
+  if ($("again")) $("again").onclick = () => { choose(run.file); $("go").click(); };
+  $("train").onchange = (e) => { state.train = e.target.checked; };
+  $("reset").onclick = () => { run.form = null; render(run); };
+  const base = run.filename.replace(/\.[^.]+$/, "");
+  $("csv").onclick = () => download(base + ".purchase.csv", "﻿" + formCsv(state), "text/csv");
+  $("formjson").onclick = () => download(base + ".purchase.json", JSON.stringify(formJson(state, run), null, 2), "application/json");
+}
+
+function formJson(state, run) {
+  return {
+    source_file: run.filename,
+    train_supplier_format: state.train,
+    fields: { ...state.fields },
+    items: state.items.map(row => ({ ...row.cells })),
+  };
+}
+
+function csvCell(v) {
+  let s = String(v ?? "");
+  if (/^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s;  // spreadsheets would run it as a formula
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function formCsv(state) {
+  const lines = [["Section", "Field", "Key", "Value"].join(",")];
+  FORM.sections.forEach(s => (s.groups || []).forEach(g => g.fields.forEach(f =>
+    lines.push([s.title, f.label, f.key, state.fields[f.key]].map(csvCell).join(",")))));
+  lines.push("");
+  const cols = FORM.items.columns;
+  lines.push(cols.map(c => csvCell(c.label)).join(","));
+  state.items.forEach(row => lines.push(cols.map(c => csvCell(row.cells[c.key])).join(",")));
+  return lines.join("\r\n");
+}
+
+function selectRunFromHash() {
+  // "#job=<id>" reopens a job of this tester server (e.g. after reloading the page).
+  const id = new URLSearchParams(location.hash.slice(1)).get("job");
+  if (!id || runs.some(r => r.id === id)) return;
+  const run = { id, filename: "job " + id.slice(0, 8), state: "running", started: Date.now(), previewUrl: `/api/jobs/${id}/file` };
+  runs.unshift(run);
+  select(run);
+  fetch(`/api/jobs/${id}`).then(r => r.json()).then(job => {
+    if (job.filename) run.filename = job.filename;
+    if (!/^image\//.test(job.content_type || "")) run.previewUrl = null;
+    if (job.started) run.started = job.started * 1000;
+    poll(run);
+  }).catch(() => poll(run));
+}
+
+$("rail").onclick = () => { document.querySelector("main").classList.remove("collapsed"); if (current) render(current); };
+checkApi();
+setInterval(checkApi, 30000);
+formReady.then(() => { if (current && current.state === "done") render(current); });
+selectRunFromHash();
+window.addEventListener("hashchange", selectRunFromHash);
+</script>
+</body>
+</html>

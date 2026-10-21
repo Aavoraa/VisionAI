@@ -1,0 +1,603 @@
+{
+  "_help": [
+    "Layout of the purchase-entry form in the Invoice Tester. Edit labels, order or sources here; reload the page.",
+    "key: the name used in Export CSV/JSON. label: what the form shows.",
+    "source: where the extracted value comes from: invoice.<field> (core fields), details.<field> (purchase-entry details),",
+    "  or null for a field you fill in yourself (not printed on invoices). formula: computed in the page (marked f).",
+    "type: text (default), date, number. wide: spans the whole row. hint: small text under the field.",
+    "tabs: the tabs of the form and the sections each shows. fill: the column gets an 'all' box that sets every line. fx: marked f (a value formulas use)."
+  ],
+  "tabs": [
+    {
+      "title": "Supplier & Buyer",
+      "sections": [
+        "Supplier & Buyer"
+      ]
+    },
+    {
+      "title": "Invoice & Transport",
+      "sections": [
+        "Invoice & Transport"
+      ]
+    },
+    {
+      "title": "Line Items, Taxes & Totals",
+      "sections": [
+        "Items",
+        "Taxes & Totals"
+      ]
+    },
+    {
+      "title": "GRN & Notes",
+      "sections": [
+        "GRN & Notes"
+      ]
+    },
+    {
+      "title": "Receive & Post",
+      "sections": [],
+      "disabled": "Posting to stock happens in the ERP, not in this tester"
+    },
+    {
+      "title": "Stock & Labels",
+      "sections": [],
+      "disabled": "Stock and labels happen in the ERP, not in this tester"
+    }
+  ],
+  "sections": [
+    {
+      "title": "Supplier & Buyer",
+      "groups": [
+        {
+          "title": "Supplier",
+          "fields": [
+            {
+              "key": "supplier_name",
+              "label": "Name",
+              "source": "invoice.vendor_name"
+            },
+            {
+              "key": "supplier_trading_name",
+              "label": "Legal / Trading Name",
+              "source": "invoice.vendor_name"
+            },
+            {
+              "key": "supplier_gstin",
+              "label": "GSTIN",
+              "source": "invoice.vendor_gstin"
+            },
+            {
+              "key": "supplier_pan",
+              "label": "PAN",
+              "source": "details.vendor_pan"
+            },
+            {
+              "key": "supplier_state",
+              "label": "State",
+              "source": "details.vendor_state"
+            },
+            {
+              "key": "supplier_state_code",
+              "label": "State Code",
+              "source": "details.vendor_state_code"
+            },
+            {
+              "key": "supplier_cin",
+              "label": "CIN",
+              "source": null
+            },
+            {
+              "key": "supplier_phone",
+              "label": "Phone",
+              "source": "details.vendor_phone"
+            },
+            {
+              "key": "supplier_email",
+              "label": "Email",
+              "source": "details.vendor_email"
+            },
+            {
+              "key": "manufacturer",
+              "label": "Manufacturer / MFG by",
+              "source": null
+            },
+            {
+              "key": "supplier_address",
+              "label": "Address",
+              "source": "invoice.vendor_address",
+              "wide": true
+            }
+          ]
+        },
+        {
+          "title": "Supplier Bank",
+          "half": true,
+          "fields": [
+            {
+              "key": "bank_name",
+              "label": "Bank Name",
+              "source": "details.bank_name"
+            },
+            {
+              "key": "bank_account",
+              "label": "Account No",
+              "source": "details.bank_account"
+            },
+            {
+              "key": "bank_ifsc",
+              "label": "IFSC",
+              "source": "details.bank_ifsc"
+            },
+            {
+              "key": "bank_branch",
+              "label": "Branch",
+              "source": "details.bank_branch"
+            }
+          ]
+        },
+        {
+          "title": "Buyer (Bill To)",
+          "half": true,
+          "fields": [
+            {
+              "key": "buyer_name",
+              "label": "Name",
+              "source": "invoice.buyer_name"
+            },
+            {
+              "key": "buyer_gstin",
+              "label": "GSTIN",
+              "source": "invoice.buyer_gstin"
+            },
+            {
+              "key": "buyer_state",
+              "label": "State",
+              "source": "details.buyer_state"
+            },
+            {
+              "key": "buyer_address",
+              "label": "Address",
+              "source": "invoice.buyer_address"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Invoice & Transport",
+      "groups": [
+        {
+          "title": "Invoice",
+          "fields": [
+            {
+              "key": "invoice_no",
+              "label": "Invoice No",
+              "source": "invoice.invoice_number"
+            },
+            {
+              "key": "invoice_date",
+              "label": "Date",
+              "source": "invoice.invoice_date",
+              "type": "date"
+            },
+            {
+              "key": "due_date",
+              "label": "Due Date",
+              "source": "details.due_date",
+              "type": "date"
+            },
+            {
+              "key": "challan_no",
+              "label": "Challan / DC No",
+              "source": "details.challan_no"
+            },
+            {
+              "key": "order_no",
+              "label": "Order No",
+              "source": "details.order_no"
+            },
+            {
+              "key": "order_date",
+              "label": "Order Date",
+              "source": "details.order_date",
+              "type": "date"
+            },
+            {
+              "key": "reference_no",
+              "label": "Reference No",
+              "source": "details.reference_no"
+            },
+            {
+              "key": "payment_terms",
+              "label": "Payment Terms",
+              "source": "invoice.payment_terms"
+            },
+            {
+              "key": "agent",
+              "label": "Agent",
+              "source": "details.agent"
+            },
+            {
+              "key": "broker",
+              "label": "Broker",
+              "source": "details.broker"
+            }
+          ]
+        },
+        {
+          "title": "E-Invoice & Transport",
+          "fields": [
+            {
+              "key": "irn",
+              "label": "IRN",
+              "source": "details.irn",
+              "wide": true
+            },
+            {
+              "key": "ack_no",
+              "label": "ACK No",
+              "source": "details.ack_no"
+            },
+            {
+              "key": "irn_date",
+              "label": "IRN Date",
+              "source": "details.ack_date",
+              "type": "date"
+            },
+            {
+              "key": "eway_bill",
+              "label": "E-way Bill",
+              "source": "details.eway_bill"
+            },
+            {
+              "key": "transport_id",
+              "label": "Transport / EWB Tran ID",
+              "source": null
+            },
+            {
+              "key": "lr_no",
+              "label": "LR No",
+              "source": "details.lr_no"
+            },
+            {
+              "key": "lr_date",
+              "label": "LR Date",
+              "source": "details.lr_date",
+              "type": "date"
+            },
+            {
+              "key": "transporter",
+              "label": "Transporter",
+              "source": "details.transporter"
+            },
+            {
+              "key": "destination",
+              "label": "Destination",
+              "source": "details.destination"
+            },
+            {
+              "key": "book_city",
+              "label": "Book City",
+              "source": null
+            },
+            {
+              "key": "delivery_note",
+              "label": "Delivery Note",
+              "source": "invoice.delivery_note"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Items",
+      "items": true
+    },
+    {
+      "title": "Taxes & Totals",
+      "groups": [
+        {
+          "title": "Taxes",
+          "half": true,
+          "columns": 2,
+          "fields": [
+            {
+              "key": "cgst_rate",
+              "label": "CGST %",
+              "source": "details.cgst_rate",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "cgst_amount",
+              "label": "CGST Amount",
+              "source": "invoice.cgst",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "sgst_rate",
+              "label": "SGST %",
+              "source": "details.sgst_rate",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "sgst_amount",
+              "label": "SGST Amount",
+              "source": "invoice.sgst",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "igst_rate",
+              "label": "IGST %",
+              "source": "details.igst_rate",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "igst_amount",
+              "label": "IGST Amount",
+              "source": "invoice.igst",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "special_discount_pct",
+              "label": "Special Discount %",
+              "source": "formula.discount_pct",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "special_discount",
+              "label": "Special Discount",
+              "source": "invoice.discount",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "other_charges",
+              "label": "Other Charges",
+              "source": null,
+              "type": "number"
+            },
+            {
+              "key": "freight",
+              "label": "Freight",
+              "source": null,
+              "type": "number"
+            },
+            {
+              "key": "round_off",
+              "label": "Round Off",
+              "source": "invoice.round_off",
+              "type": "number"
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "source": null,
+              "type": "number",
+              "hint": "Deducted when the bill is paid, not from the invoice total."
+            }
+          ]
+        },
+        {
+          "title": "Totals",
+          "half": true,
+          "columns": 2,
+          "fields": [
+            {
+              "key": "total_qty",
+              "label": "Total Qty",
+              "source": "invoice.total_quantity",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "sub_total",
+              "label": "Sub Total",
+              "source": "details.gross_amount",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "taxable_total",
+              "label": "Taxable Total",
+              "source": "invoice.subtotal",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "tax_total",
+              "label": "Tax Total",
+              "source": "details.tax_total",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "grand_total",
+              "label": "Grand Total",
+              "source": "invoice.total_amount",
+              "type": "number",
+              "formula": true
+            },
+            {
+              "key": "amount_in_words",
+              "label": "Amount in Words",
+              "source": "details.amount_in_words",
+              "wide": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "GRN & Notes",
+      "groups": [
+        {
+          "fields": [
+            {
+              "key": "grn_no",
+              "label": "GRN No",
+              "source": null
+            },
+            {
+              "key": "grn_date",
+              "label": "GRN Date",
+              "source": null,
+              "type": "date"
+            },
+            {
+              "key": "received_by",
+              "label": "Received By",
+              "source": null
+            },
+            {
+              "key": "notes",
+              "label": "Notes",
+              "source": null,
+              "wide": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "items": {
+    "columns": [
+      {
+        "key": "line",
+        "label": "#",
+        "source": "line_number",
+        "type": "number",
+        "width": 44
+      },
+      {
+        "key": "description",
+        "label": "Description",
+        "source": "description",
+        "width": 220
+      },
+      {
+        "key": "brand",
+        "label": "Brand",
+        "source": null,
+        "fill": "all"
+      },
+      {
+        "key": "design",
+        "label": "Design",
+        "source": "design",
+        "fill": "all"
+      },
+      {
+        "key": "size",
+        "label": "Size",
+        "source": "size",
+        "fill": "all"
+      },
+      {
+        "key": "hsn",
+        "label": "HSN",
+        "source": "hsn_sac",
+        "fill": "all"
+      },
+      {
+        "key": "qty",
+        "label": "Qty",
+        "source": "quantity",
+        "type": "number"
+      },
+      {
+        "key": "uom",
+        "label": "UOM",
+        "source": "unit",
+        "fill": "all"
+      },
+      {
+        "key": "mrp",
+        "label": "MRP",
+        "source": "mrp",
+        "type": "number",
+        "fx": true,
+        "fill": "all"
+      },
+      {
+        "key": "discount_pct",
+        "label": "Discount %",
+        "source": "discount_percent",
+        "type": "number",
+        "fx": true,
+        "fill": "%"
+      },
+      {
+        "key": "rate",
+        "label": "Rate",
+        "source": "rate",
+        "type": "number",
+        "fx": true,
+        "fill": "all"
+      },
+      {
+        "key": "buffer_pct",
+        "label": "Buffer %",
+        "source": null,
+        "type": "number",
+        "fx": true,
+        "fill": "%"
+      },
+      {
+        "key": "mrp_buffer_pct",
+        "label": "MRP Buffer %",
+        "source": null,
+        "type": "number",
+        "fx": true,
+        "fill": "%"
+      },
+      {
+        "key": "sale_disc_pct",
+        "label": "Sale Disc %",
+        "source": null,
+        "type": "number",
+        "fx": true,
+        "fill": "%"
+      },
+      {
+        "key": "sell_price",
+        "label": "Sell Price",
+        "source": "formula.sell_price",
+        "type": "number",
+        "formula": true
+      },
+      {
+        "key": "taxable",
+        "label": "Taxable",
+        "source": "formula.taxable",
+        "type": "number",
+        "formula": true
+      },
+      {
+        "key": "amount",
+        "label": "Amount",
+        "source": "formula.amount",
+        "type": "number",
+        "formula": true
+      },
+      {
+        "key": "gst_pct",
+        "label": "GST %",
+        "source": "tax_rate",
+        "type": "number",
+        "fill": "%"
+      }
+    ],
+    "formulas": {
+      "taxable": "qty x rate x (1 - discount % / 100); the amount printed on the invoice when it matches",
+      "amount": "taxable x (1 + GST % / 100); GST % defaults to the invoice's rate",
+      "sell_price": "MRP x (1 - sale disc % / 100), when an MRP is entered"
+    }
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "exam": {
+    "name": "Unit Test 1 — Science (demo)",
+    "academic_year": "2026-27",
+    "class_name": "7",
+    "section": "A",
+    "subject": "Science",
+    "grade_level": "CBSE Class 7",
+    "instructions": "Answer in full sentences. Show working for calculations."
+  },
+  "questions": [
+    {
+      "number": "1",
+      "qtype": "science",
+      "max_marks": 2,
+      "mark_increment": 0.5,
+      "text": "Why do plants need sunlight?"
+    },
+    {
+      "number": "2",
+      "qtype": "science",
+      "max_marks": 3,
+      "mark_increment": 0.5,
+      "text": "Explain the difference between evaporation and boiling."
+    },
+    {
+      "number": "3",
+      "qtype": "math",
+      "max_marks": 3,
+      "mark_increment": 0.5,
+      "text": "A car travels 120 km in 2 hours. Find its speed. Show your working.",
+      "numeric_answer": "60",
+      "unit": "km/h"
+    },
+    {
+      "number": "4",
+      "qtype": "short",
+      "max_marks": 2,
+      "mark_increment": 0.5,
+      "text": "Write two functions of roots."
+    }
+  ],
+  "students": [
+    {
+      "admission_no": "A1001",
+      "name": "Arun Kumar",
+      "roll_no": "1",
+      "answers": {
+        "1": "Plants use light energy to make their own food by photosynthesis.",
+        "2": "Evaporation happens only at the surface of a liquid and at any temperature. Boiling happens throughout the liquid at a fixed temperature called the boiling point.",
+        "3": "Speed = Distance / Time\n= 120 km / 2 h\n= 60 km/h",
+        "4": "1. Roots absorb water and minerals from the soil.\n2. Roots hold the plant firmly in the ground."
+      },
+      "expected_marks": {
+        "1": 2,
+        "2": 3,
+        "3": 3,
+        "4": 2
+      },
+      "pages": 2
+    },
+    {
+      "admission_no": "A1002",
+      "name": "Divya S",
+      "roll_no": "2",
+      "answers": {
+        "1": "Plants need sunlight for photosynthesis.",
+        "2": "In boiling the bubbles form only at the surface. Evaporation is slow.",
+        "3": "Speed = distance / time = 120 / 2 = 50 km/h",
+        "4": "Roots absorb water."
+      },
+      "expected_marks": {
+        "1": 1,
+        "2": 0,
+        "3": 2,
+        "4": 1
+      },
+      "pages": 1
+    },
+    {
+      "admission_no": "A1003",
+      "name": "Kiran R",
+      "roll_no": "3",
+      "answers": {
+        "1": "The leaves catch the sun rays and with that energy they prepare food (glucose) for the plant.",
+        "3": "120 / 2 = 60",
+        "4": "They store food like in carrot. They also keep the tree standing in strong wind."
+      },
+      "expected_marks": {
+        "1": 2,
+        "2": 0,
+        "3": 1.5,
+        "4": 2
+      },
+      "pages": 1
+    }
+  ]
+}

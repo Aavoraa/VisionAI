@@ -1,0 +1,7 @@
+# Development & test dependencies (not installed in the Docker image).
+-r requirements.txt
+
+pytest~=9.1.1
+aiosqlite~=0.22.1  # in-memory DB for tests
+fakeredis~=2.38.0  # in-memory Redis for tests
+pyyaml~=6.0.3  # parses docker-compose.yml in tests/test_deploy.py

@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+# Make `app` and `scripts` importable when running plain `pytest` from the project root.
+pythonpath = ["."]
+testpaths = ["tests"]

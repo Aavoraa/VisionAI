@@ -1,0 +1,63 @@
+# VisionAI monorepo — code only. No secrets, no real documents, no large binaries.
+
+# --- only these top-level folders are part of the repo -----------------------
+/*
+!/.gitignore
+!/README.md
+!/vision API/
+!/EXAM(local+vision api)/
+!/exam(vision)/
+!/Bill Scan system/
+
+# --- secrets -------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+secret.key
+*.pem
+*.key
+
+# --- databases and stored documents (accounts, key hashes, invoices, student sheets, bills)
+*.db
+*.db-shm
+*.db-wal
+data/
+uploads/
+/vision API/Taqua - Bills/
+/vision API/vision-api/benchmarks/
+/EXAM(local+vision api)/benchmarks/
+/exam(vision)/benchmarks/
+
+# --- models and binaries (GBs; download / build separately) --------------------
+/vision API/models/
+/vision API/tools/
+*.gguf
+*.safetensors
+*.bin
+*.exe
+*.dll
+
+# --- environments, dependencies, builds, caches --------------------------------
+.venv/
+.venv-*/
+venv/
+node_modules/
+.next/
+dist/
+out/
+build/
+coverage/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.tsbuildinfo
+
+# --- local tool / editor settings ---------------------------------------------
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,3 @@
+# Private console: nothing to index.
+User-agent: *
+Disallow: /

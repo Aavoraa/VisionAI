@@ -1,0 +1,32 @@
+# Runtime dependencies (installed in the Docker image).
+# Development/test extras live in requirements-dev.txt.
+
+# --- Web / API ---
+fastapi~=0.141.1
+uvicorn[standard]~=0.53.0
+pydantic~=2.13.5
+pydantic-settings~=2.15.0
+python-multipart~=0.0.32  # multipart/form-data image uploads
+
+# --- Database ---
+SQLAlchemy[asyncio]~=2.0.54
+asyncpg~=0.31.0
+
+# --- Cache / rate limiting ---
+redis~=8.1.0
+
+# --- Dashboard account passwords (Argon2id) ---
+argon2-cffi~=25.1.0
+
+# --- Outbound HTTP (SSRF-guarded image fetching) ---
+httpx~=0.28.1
+
+# --- Image processing ---
+Pillow~=12.3.0
+numpy~=2.5.3  # invoice table band detection and deskew (invoice_bands)
+pypdfium2~=5.13.0  # PDF pages -> images for invoice extraction (Apache-2.0/BSD, bundles pdfium)
+
+# --- Local model inference (optional, only when VISION_USE_MOCK_MODEL=false) ---
+# Multi-GB and platform-specific, so not installed by default:
+#   pip install torch torchvision transformers accelerate
+# (the Docker image installs them with: --build-arg INSTALL_LOCAL_MODEL=true)

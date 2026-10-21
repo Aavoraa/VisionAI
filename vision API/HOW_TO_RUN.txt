@@ -1,0 +1,250 @@
+VISION AI PLATFORM - HOW TO RUN
+===============================
+
+This folder has two projects:
+
+  vision-api\   FastAPI backend (the API itself)          -> http://localhost:8000
+  dashboard\    Next.js web console (keys, usage, admin)  -> http://localhost:3000
+
+Pick ONE of the options below (on a computer with an NVIDIA graphics card, use Option D).
+  Option A: everything in Docker (easiest, needs Docker Desktop).
+  Option B: code runs locally, and only the database and Redis run in Docker.
+  Option C: no Docker at all (uses SQLite and runs without Redis; for trying it out on this PC).
+  Option D: NVIDIA graphics card (everything in Docker plus a real model on the GPU).
+
+
+---------------------------------------------------------------------
+OPTION A - EVERYTHING IN DOCKER
+---------------------------------------------------------------------
+Requires: Docker Desktop (Docker Compose v2.24 or newer).
+
+1. Open a terminal in the vision-api folder:
+
+     cd "C:\Users\USER\ui ux\vision API\vision-api"
+
+2. Create the config file (only the first time):
+
+     copy .env.example .env
+
+3. Build and start everything (database, Redis, API, dashboard, nginx):
+
+     docker-compose up -d --build
+
+   The first build takes a few minutes. Check that the services are healthy:
+
+     docker-compose ps
+
+4. Create your administrator account (it asks for a password, 10+ characters):
+
+     docker-compose run --rm api python scripts/create_admin.py --email you@example.com
+
+5. Open:
+     Dashboard  http://localhost:3000   (sign in with the admin account)
+     API docs   http://localhost:8000/docs
+
+   Optional: an API key from the command line (you can also create keys in the dashboard):
+
+     docker-compose exec api python scripts/create_api_key.py
+
+Stop:             docker-compose down
+Stop + wipe data: docker-compose down -v
+
+Port already taken? Add a line to vision-api\.env, e.g. API_HOST_PORT=8080 or
+DASHBOARD_HOST_PORT=3001, then run "docker-compose up -d" again.
+
+
+---------------------------------------------------------------------
+OPTION B - LOCAL CODE, WITH THE DATABASE AND REDIS IN DOCKER
+---------------------------------------------------------------------
+Requires: Python 3.11+, Node.js 20.9+, Docker Desktop.
+
+Terminal 1 - API:
+
+     cd "C:\Users\USER\ui ux\vision API\vision-api"
+     python -m venv .venv                      (first time only)
+     .venv\Scripts\activate
+     pip install -r requirements-dev.txt       (first time only)
+     copy .env.example .env                    (first time only)
+     docker-compose up -d db redis
+     python scripts\init_db.py
+     python scripts\create_admin.py --email you@example.com      (first time only)
+     uvicorn app.main:create_app --factory --reload --reload-dir app
+
+Terminal 2 - dashboard:
+
+     cd "C:\Users\USER\ui ux\vision API\dashboard"
+     npm install                               (first time only)
+     copy .env.example .env.local              (first time only)
+     npm run dev
+
+Open http://localhost:3000 (if port 3000 is taken, Next.js shows the port it used instead).
+
+
+---------------------------------------------------------------------
+OPTION C - NO DOCKER (SQLITE, NO REDIS)
+---------------------------------------------------------------------
+Requires: Python 3.11+, Node.js 20.9+. Good for trying things out. Not for production:
+rate limiting is switched off (the API logs an error for it) and the data is in a local file.
+
+Terminal 1 - API (PowerShell):
+
+     cd "C:\Users\USER\ui ux\vision API\vision-api"
+     .venv\Scripts\activate          (create it first as in Option B if it is missing)
+     $env:VISION_DATABASE_URL = "sqlite+aiosqlite:///./dev.db"
+     $env:VISION_REDIS_SOCKET_TIMEOUT = "0.2"
+     python scripts\init_db.py
+     python scripts\create_admin.py --email you@example.com      (first time only)
+     uvicorn app.main:create_app --factory --reload --reload-dir app
+
+   (Set the two $env: lines again in every new PowerShell window.)
+
+Terminal 2 - dashboard: same as Option B.
+
+On this PC the API uses PaddleOCR-VL through llama.cpp (vision-api\.env), so start the
+llama.cpp servers FIRST and leave them running. They run on the NVIDIA GPU (RTX A1000) with the
+CUDA build in tools\llama.cpp-cuda; double-click, or run in their own windows:
+
+     start-ocr-gpu.bat          (Terminal 0:  PaddleOCR-VL on port 8090)
+     start-reasoner-gpu.bat     (Terminal 0b: Qwen3-VL-2B reasoning model on port 8091, optional,
+                                 for invoice cross-checking)
+
+   Both together use about 6 GB of the card's 8 GB ("nvidia-smi" shows it). Port 8090 because an
+   Apache web server already uses 8080 on this PC.
+
+   CPU FALLBACK (no NVIDIA card, or the card is busy): run the same models with the CPU build,
+   and in vision-api\.env set VISION_MODEL_TIMEOUT_SECONDS=600 and VISION_INVOICE_REREAD_MAX_FIELDS=4,
+   in dashboard\.env.local VISION_PROXY_TIMEOUT_MS=630000:
+
+     tools\llama.cpp\llama-server.exe -m models\paddleocr-vl-1.6\PaddleOCR-VL-1.6-GGUF.gguf --mmproj models\paddleocr-vl-1.6\PaddleOCR-VL-1.6-GGUF-mmproj.gguf --temp 0 -c 16384 --host 127.0.0.1 --port 8090
+     tools\llama.cpp\llama-server.exe -m models\qwen3-vl-2b\Qwen3VL-2B-Instruct-Q4_K_M.gguf --mmproj models\qwen3-vl-2b\mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf --temp 0 -c 16384 --host 127.0.0.1 --port 8091
+
+
+---------------------------------------------------------------------
+OPTION D - COMPUTER WITH AN NVIDIA GRAPHICS CARD (REAL MODEL, FAST)
+---------------------------------------------------------------------
+Requires: NVIDIA driver, Docker Desktop (WSL 2 engine), Node/Python NOT needed.
+
+1. Check the card is visible:            nvidia-smi
+2. Check Docker can use it:              docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu24.04 nvidia-smi
+3. In vision-api\.env set:
+     VISION_USE_MOCK_MODEL=false
+     VISION_MODEL_NAME=<model that fits your card's memory, see vision-api\README.md section 13>
+4. Start everything with the GPU add-on file:
+
+     cd vision-api
+     docker-compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+
+   The first start downloads the model; watch it with:  docker-compose logs -f api
+5. Create the admin (step 4 of Option A) and open http://localhost:3000.
+
+If "nvidia-smi" shows a CUDA version older than 12.8, add TORCH_INDEX_URL to vision-api\.env
+(e.g. https://download.pytorch.org/whl/cu126) before step 4.
+
+
+---------------------------------------------------------------------
+INVOICE EXTRACTION (PaddleOCR-VL -> structured JSON)
+---------------------------------------------------------------------
+In the browser: dashboard -> Invoices (left menu) -> "Extract an invoice", paste an API key,
+choose the invoice (image or PDF) and click "Extract fields". The result shows every field with
+OK / Check / Missing and a confidence, the line items, totals, checks and a JSON download.
+
+Every extracted invoice is saved. Invoices (left menu) lists them by status:
+  Approved      confident, confirmed by the reasoning model and every check passed
+  Needs review  something needs a look (open it: the page image is next to editable fields;
+                fix values, "Save corrections", then "Approve")
+  Reprocess     the numbers did not add up; "Reprocess" reads the document again
+Saved files are in vision-api\data\invoices (private; delete an invoice to remove its files,
+or set VISION_INVOICE_FILE_RETENTION_DAYS in vision-api\.env to remove old files automatically).
+
+Exports: on the Invoices list, "Invoices CSV", "Line items CSV" or "JSON" download the invoices
+of the selected tab (e.g. Approved) for Excel or your accounting software.
+
+Zoomed crops (on by default when the reasoning model on 8091 runs): the seller, buyer, invoice
+details and totals blocks are cut out, enlarged and read again, and up to 4 doubtful fields are
+re-read the same way. A zoomed value that differs is written in the field's note; it replaces
+the first value only when that one fails its check (GSTIN checksum, totals) and is then marked
+Check. This adds under a minute per page on the GPU (several minutes on a CPU). To switch it off, in vision-api\.env set
+     VISION_INVOICE_REGION_CROPS=false
+     VISION_INVOICE_REREAD_MAX_FIELDS=0
+
+INVOICE TESTER (a separate test page: API key box, upload, every field / item / check)
+Needs the two llama-servers (8090, 8091) and the API (8000) running. In another window:
+
+    cd "C:\Users\USER\ui ux\vision API"
+    vision-api\.venv\Scripts\python.exe invoice-tester\server.py
+
+Open http://localhost:3002 in the browser (type the address; do not double-click index.html).
+Paste an API key, choose an invoice, click "Extract fields". One page takes about 1-2 minutes
+on this PC's GPU (5-15 minutes on a CPU). Results stay until the tester window is closed.
+
+The result opens as a PURCHASE FORM filled from the invoice:
+  - yellow fields: check these (the reason is written under the field)
+  - green dashed fields marked f: calculated (Taxable = Qty x Rate less Discount %,
+    Amount = Taxable + GST %, Sell Price = MRP less Sale Disc %)
+  - white empty fields: not printed on invoices (GRN No, Freight, TDS, MRP ...): fill in
+Edit anything, then "Export CSV" (opens in Excel) or "Export JSON". "Hide upload panel" gives
+the form the full width. "Download JSON" keeps the raw result; "open a saved result" reopens it.
+To rename fields or change the layout, edit invoice-tester\form_fields.json and reload.
+
+BENCHMARK (accuracy on the bills in vision-api\benchmarks\invoices)
+
+    cd "C:\Users\USER\ui ux\vision API\vision-api"
+    .venv\Scripts\python.exe scripts\benchmark_invoices.py --cached --rules-only   (seconds: re-scores saved results)
+    .venv\Scripts\python.exe scripts\benchmark_invoices.py                         (re-reads every bill: tens of minutes on the GPU, hours on CPU)
+
+From the command line: needs the llama.cpp server from Option C (start-ocr-gpu.bat) running. In another window:
+
+     cd "C:\Users\USER\ui ux\vision API\vision-api"
+     .venv\Scripts\activate
+     python scripts\extract_invoice.py "C:\path\to\invoice.jpg" --out invoice.json
+
+Works with JPEG/PNG/WebP/GIF images and PDFs (up to 10 pages). About 10-20 seconds of OCR per
+page on this PC's GPU (2-3 minutes on a CPU). invoice.json holds every field with its value, a status
+(ok / check / missing) and the text it was read from.
+
+Accuracy check against hand-checked answers (see vision-api\benchmarks\invoices\README.md):
+
+     python scripts\benchmark_invoices.py            (runs OCR on every benchmark invoice)
+     python scripts\benchmark_invoices.py --cached   (re-scores saved OCR output in seconds)
+
+
+---------------------------------------------------------------------
+QUICK TEST OF THE API
+---------------------------------------------------------------------
+Easiest: in the dashboard open "Playground" (left menu), paste an API key, choose an image,
+type a question and click "Analyse image". The answer, model name, time and tokens appear
+on the right.
+
+From the command line:
+With an API key (from the dashboard's "API keys" page or create_api_key.py):
+
+     curl.exe http://localhost:8000/v1/vision -H "Authorization: Bearer sk_live_YOUR_KEY" -F "prompt=Describe this image" -F "images=@C:\path\to\photo.jpg"
+
+(In PowerShell type curl.exe, not curl: plain "curl" there is a different command.)
+
+With Florence-2 (VISION_MODEL_NAME=florence-community/Florence-2-large) the prompt is a task,
+e.g. <OCR> to read all text. Send it with --form-string, because -F treats a leading < as a file:
+
+     curl.exe http://localhost:8000/v1/vision -H "Authorization: Bearer sk_live_YOUR_KEY" --form-string "prompt=<OCR>" -F "max_tokens=1024" -F "images=@C:\path\to\invoice.jpg"
+
+In the Playground a Task list replaces the Question box automatically.
+Or try it in the browser at http://localhost:8000/docs: open POST /v1/vision and use "Try it out".
+
+By default the model is a fast mock (VISION_USE_MOCK_MODEL=true in .env), so this answers
+instantly. To use a real model, see section 12 of vision-api\README.md (and section 13 for GPUs).
+
+
+---------------------------------------------------------------------
+RUNNING THE TESTS
+---------------------------------------------------------------------
+Backend:    cd vision-api    then    .venv\Scripts\python -m pytest -q
+Dashboard:  cd dashboard     then    npm test
+                                     npm run typecheck
+                                     npm run lint
+
+
+---------------------------------------------------------------------
+MORE DETAIL
+---------------------------------------------------------------------
+vision-api\README.md   full API guide (configuration, security, GPU, errors)
+dashboard\README.md    dashboard guide (Docker, reverse-proxy requirement, structure)
